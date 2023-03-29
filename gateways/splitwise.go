@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/aanzolaavila/splitwise.go"
 	"github.com/aanzolaavila/splitwise.go/resources"
@@ -326,4 +327,16 @@ func (ce *commandExecutorStruct[T]) cleanCe() {
 	ce.close = true
 	close(ce.ch)
 	fmt.Println("channel closed succesfuly")
+}
+
+func init() {
+	conn := Open("", context.Background(), log.New(os.Stdout, "Splitwise Init LOG: ", log.Lshortfile))
+	ceCurency := conn.GetCurecies()
+	for range ceCurency.GetChan() {
+	}
+	ceCategory := conn.GetMainCategories()
+	for range ceCategory.GetChan() {
+	}
+	fmt.Printf("Currency cache loaded with %d values\n", len(curenciesCache))
+	fmt.Printf("Main Category cache loaded with %d values\n", len(mainCategoryCache))
 }
