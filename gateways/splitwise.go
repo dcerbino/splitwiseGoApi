@@ -9,10 +9,6 @@ import (
 	"github.com/aanzolaavila/splitwise.go/resources"
 )
 
-// type splitwise interface {
-// 	GetExpense(params splitwise.ExpensesParams) <-chan resources.Expense
-// }
-
 type splitwiseResouces interface {
 	resources.Expense |
 		resources.MainCategory |
