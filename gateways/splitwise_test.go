@@ -74,3 +74,39 @@ func TestGetCategoryNotFound(t *testing.T) {
 	assert.EqualErrorf(t, err, (&ElementNotFound{}).Error(), "Error should be: %v, got: %v", (&ElementNotFound{}).Error(), err)
 
 }
+
+func TestGetCategoryies(t *testing.T) {
+	token := "test"
+	ctx := context.Background()
+	log := log.New(os.Stdout, "Splitwise LOG: ", log.Lshortfile)
+
+	conn := Open(token, ctx, log)
+
+	executor := conn.GetMainCategories()
+	cont := 0
+	want := 7
+
+	for range executor.GetChan() {
+		cont++
+	}
+
+	assert.GreaterOrEqual(t, cont, want, "Get categories should return unless %d arg and got it %d", want, cont)
+}
+
+func TestGetCurrencies(t *testing.T) {
+	token := "test"
+	ctx := context.Background()
+	log := log.New(os.Stdout, "Splitwise LOG: ", log.Lshortfile)
+
+	conn := Open(token, ctx, log)
+
+	executor := conn.GetCurecies()
+	cont := 0
+	want := 148
+
+	for range executor.GetChan() {
+		cont++
+	}
+
+	assert.GreaterOrEqual(t, cont, want, "Get currencies should return unless %d currencies and got it %d", want, cont)
+}
