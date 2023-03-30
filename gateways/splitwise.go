@@ -69,7 +69,7 @@ var curenciesCache map[string]resources.Currency = make(map[string]resources.Cur
 
 func Open(token string, ctx context.Context, log *log.Logger) SwConnection {
 
-	conn := swConnectionStruct{}
+	conn := &swConnectionStruct{}
 
 	conn.client = getTokenClient(token)
 	conn.client.Logger = log
@@ -77,7 +77,7 @@ func Open(token string, ctx context.Context, log *log.Logger) SwConnection {
 	return conn
 }
 
-func (cs swConnectionStruct) getCtx() context.Context {
+func (cs *swConnectionStruct) getCtx() context.Context {
 	return cs.ctx
 }
 
@@ -124,24 +124,7 @@ func simpleExecutor[T splitwiseResouces](conn SwConnection, method func(ctx cont
 
 }
 
-func (conn swConnectionStruct) GetMainCategories() CommandExecutor[resources.MainCategory] {
-	if len(mainCategoryCache) == 0 {
-		client := conn.getClient()
-		ce := simpleExecutor(conn, client.GetCategories)
-		for v := range ce.GetChan() {
-			mainCategoryCache[resources.Identifier(v.ID)] = v
-		}
-		return conn.GetMainCategories()
-	}
-	return conn.retriveCachedMainCategor()
-}
-
-func (conn swConnectionStruct) GetMainCategory(id resources.Identifier) (resources.MainCategory, error) {
-	if len(mainCategoryCache) == 0 {
-		tmp := conn.GetMainCategories()
-		for range tmp.GetChan() {
-		}
-	}
+func (conn *swConnectionStruct) GetMainCategory(id resources.Identifier) (resources.MainCategory, error) {
 	result, ok := mainCategoryCache[id]
 	if !ok {
 		return resources.MainCategory{}, &ElementNotFound{}
@@ -150,7 +133,7 @@ func (conn swConnectionStruct) GetMainCategory(id resources.Identifier) (resourc
 	return result, nil
 }
 
-func (conn swConnectionStruct) retriveCachedMainCategor() CommandExecutor[resources.MainCategory] {
+func (conn *swConnectionStruct) GetMainCategories() CommandExecutor[resources.MainCategory] {
 	ch := make(chan resources.MainCategory)
 	ce := commandExecutorStruct[resources.MainCategory]{}
 	ce.ch = ch
@@ -167,24 +150,7 @@ func (conn swConnectionStruct) retriveCachedMainCategor() CommandExecutor[resour
 	return &ce
 }
 
-func (conn swConnectionStruct) GetCurecies() CommandExecutor[resources.Currency] {
-	if len(curenciesCache) == 0 {
-		client := conn.getClient()
-		ce := simpleExecutor(conn, client.GetCurrencies)
-		for v := range ce.GetChan() {
-			curenciesCache[v.CurrencyCode] = v
-		}
-		return conn.GetCurecies()
-	}
-	return conn.retriveCachedCurrency()
-}
-
-func (conn swConnectionStruct) GetCurency(code string) (resources.Currency, error) {
-	if len(curenciesCache) == 0 {
-		tmp := conn.GetCurecies()
-		for range tmp.GetChan() {
-		}
-	}
+func (conn *swConnectionStruct) GetCurency(code string) (resources.Currency, error) {
 	result, ok := curenciesCache[code]
 	if !ok {
 		return resources.Currency{}, &ElementNotFound{}
@@ -193,7 +159,7 @@ func (conn swConnectionStruct) GetCurency(code string) (resources.Currency, erro
 	return result, nil
 }
 
-func (conn swConnectionStruct) retriveCachedCurrency() CommandExecutor[resources.Currency] {
+func (conn *swConnectionStruct) GetCurecies() CommandExecutor[resources.Currency] {
 	ch := make(chan resources.Currency)
 	ce := commandExecutorStruct[resources.Currency]{}
 	ce.ch = ch
@@ -211,29 +177,29 @@ func (conn swConnectionStruct) retriveCachedCurrency() CommandExecutor[resources
 
 }
 
-func (conn swConnectionStruct) GetFriends() CommandExecutor[resources.Friend] {
+func (conn *swConnectionStruct) GetFriends() CommandExecutor[resources.Friend] {
 	client := conn.getClient()
 	return simpleExecutor(conn, client.GetFriends)
 }
 
-func (conn swConnectionStruct) GetFriend(id int) (resources.Friend, error) {
+func (conn *swConnectionStruct) GetFriend(id int) (resources.Friend, error) {
 	client := conn.getClient()
 	return client.GetFriend(conn.ctx, id)
 }
 
-func (conn swConnectionStruct) GetGroups() CommandExecutor[resources.Group] {
+func (conn *swConnectionStruct) GetGroups() CommandExecutor[resources.Group] {
 	client := conn.getClient()
 
 	return simpleExecutor(conn, client.GetGroups)
 }
 
-func (conn swConnectionStruct) GetGroup(id int) (resources.Group, error) {
+func (conn *swConnectionStruct) GetGroup(id int) (resources.Group, error) {
 	client := conn.getClient()
 
 	return client.GetGroup(conn.ctx, id)
 }
 
-func (conn swConnectionStruct) GetNotifications(params splitwise.NotificationsParams) CommandExecutor[resources.Notification] {
+func (conn *swConnectionStruct) GetNotifications(params splitwise.NotificationsParams) CommandExecutor[resources.Notification] {
 	ch := make(chan resources.Notification)
 	ce := commandExecutorStruct[resources.Notification]{}
 	ce.ch = ch
@@ -263,13 +229,13 @@ func (conn swConnectionStruct) GetNotifications(params splitwise.NotificationsPa
 	return &ce
 }
 
-func (conn swConnectionStruct) GetExpense(id int) (resources.Expense, error) {
+func (conn *swConnectionStruct) GetExpense(id int) (resources.Expense, error) {
 	client := conn.getClient()
 
 	return client.GetExpense(conn.ctx, id)
 }
 
-func (conn swConnectionStruct) GetExpenses(params splitwise.ExpensesParams) CommandExecutor[resources.Expense] {
+func (conn *swConnectionStruct) GetExpenses(params splitwise.ExpensesParams) CommandExecutor[resources.Expense] {
 	ch := make(chan resources.Expense)
 	ce := commandExecutorStruct[resources.Expense]{}
 
@@ -311,7 +277,7 @@ func (conn swConnectionStruct) GetExpenses(params splitwise.ExpensesParams) Comm
 	return &ce
 }
 
-func (conn swConnectionStruct) getClient() splitwise.Client {
+func (conn *swConnectionStruct) getClient() splitwise.Client {
 	return conn.client
 }
 
@@ -336,20 +302,20 @@ func (ce *commandExecutorStruct[T]) cleanCe() {
 
 func init() {
 	conn := Open("", context.Background(), log.New(os.Stdout, "Splitwise Init LOG: ", log.Lshortfile))
-	// ceCurency := conn.GetCurecies()
 
 	client := conn.getClient()
 
-	ce := simpleExecutor(conn, client.GetCurrencies)
-	for v := range ce.GetChan() {
+	ceCurrencies := simpleExecutor(conn, client.GetCurrencies)
+	for v := range ceCurrencies.GetChan() {
 		curenciesCache[v.CurrencyCode] = v
 	}
 
-	// for range ceCurency.GetChan() {
-	// }
-	ceCategory := conn.GetMainCategories()
-	for range ceCategory.GetChan() {
+	ceMainCategory := simpleExecutor(conn, client.GetCategories)
+
+	for v := range ceMainCategory.GetChan() {
+		mainCategoryCache[resources.Identifier(v.ID)] = v
 	}
+
 	fmt.Printf("Currency cache loaded with %d values\n", len(curenciesCache))
 	fmt.Printf("Main Category cache loaded with %d values\n", len(mainCategoryCache))
 }
