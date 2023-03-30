@@ -26,9 +26,9 @@ type swConnectionStruct struct {
 
 type SwConnection interface {
 	GetMainCategories() CommandExecutor[resources.MainCategory]
-	GetMainCategory(id resources.Identifier) (resources.MainCategory, error)
+	GetMainCategory(id resources.Identifier) (*resources.MainCategory, error)
 	GetCurecies() CommandExecutor[resources.Currency]
-	GetCurency(code string) (resources.Currency, error)
+	GetCurency(code string) (*resources.Currency, error)
 	GetFriends() CommandExecutor[resources.Friend]
 	GetFriend(id int) (resources.Friend, error)
 	GetGroups() CommandExecutor[resources.Group]
@@ -124,13 +124,13 @@ func simpleExecutor[T splitwiseResouces](conn SwConnection, method func(ctx cont
 
 }
 
-func (conn *swConnectionStruct) GetMainCategory(id resources.Identifier) (resources.MainCategory, error) {
+func (conn *swConnectionStruct) GetMainCategory(id resources.Identifier) (*resources.MainCategory, error) {
 	result, ok := mainCategoryCache[id]
 	if !ok {
-		return resources.MainCategory{}, &ElementNotFound{}
+		return nil, &ElementNotFound{}
 	}
 
-	return result, nil
+	return &result, nil
 }
 
 func (conn *swConnectionStruct) GetMainCategories() CommandExecutor[resources.MainCategory] {
@@ -150,13 +150,13 @@ func (conn *swConnectionStruct) GetMainCategories() CommandExecutor[resources.Ma
 	return &ce
 }
 
-func (conn *swConnectionStruct) GetCurency(code string) (resources.Currency, error) {
+func (conn *swConnectionStruct) GetCurency(code string) (*resources.Currency, error) {
 	result, ok := curenciesCache[code]
 	if !ok {
-		return resources.Currency{}, &ElementNotFound{}
+		return nil, &ElementNotFound{}
 	}
 
-	return result, nil
+	return &result, nil
 }
 
 func (conn *swConnectionStruct) GetCurecies() CommandExecutor[resources.Currency] {

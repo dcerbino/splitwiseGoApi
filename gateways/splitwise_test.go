@@ -110,3 +110,38 @@ func TestGetCurrencies(t *testing.T) {
 
 	assert.GreaterOrEqual(t, cont, want, "Get currencies should return unless %d currencies and got it %d", want, cont)
 }
+
+func TestGetCurrency(t *testing.T) {
+	assert := assert.New(t)
+
+	token := "test"
+	ctx := context.Background()
+	log := log.New(os.Stdout, "Splitwise LOG: ", log.Lshortfile)
+
+	conn := Open(token, ctx, log)
+
+	currencyCode := "USD"
+	currencyUnit := "$"
+
+	currency, err := conn.GetCurency(currencyCode)
+
+	assert.NoError(err, "%s should be present as a currency code", currencyCode)
+	assert.Equal(currencyUnit, currency.Unit, "%s currency unit should be %s but got %s", currencyCode, currencyUnit, currency.Unit)
+}
+
+func TestGetCurrencyNotFund(t *testing.T) {
+	assert := assert.New(t)
+
+	token := "test"
+	ctx := context.Background()
+	log := log.New(os.Stdout, "Splitwise LOG: ", log.Lshortfile)
+
+	conn := Open(token, ctx, log)
+
+	currencyCode := "US"
+
+	_, err := conn.GetCurency(currencyCode)
+
+	assert.EqualErrorf(err, (&ElementNotFound{}).Error(), "Error should be: %v, got: %v", (&ElementNotFound{}).Error(), err)
+
+}
