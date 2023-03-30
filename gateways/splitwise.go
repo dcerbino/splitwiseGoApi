@@ -37,10 +37,11 @@ type SwConnection interface {
 	GetExpense(id int) (resources.Expense, error)
 	GetExpenses(params splitwise.ExpensesParams) CommandExecutor[resources.Expense]
 	getClient() splitwise.Client
+	getCtx() context.Context
 }
 
 type commandExecutorStruct[T splitwiseResouces] struct {
-	swConnectionStruct
+	SwConnection
 	ch    chan T
 	close bool
 }
@@ -76,6 +77,10 @@ func Open(token string, ctx context.Context, log *log.Logger) SwConnection {
 	return conn
 }
 
+func (cs swConnectionStruct) getCtx() context.Context {
+	return cs.ctx
+}
+
 func (ce *commandExecutorStruct[T]) isClose() bool {
 	return ce.close
 }
@@ -90,17 +95,17 @@ func (ce *commandExecutorStruct[T]) GetChan() <-chan T {
 	return ce.ch
 }
 
-func simpleExecutor[T splitwiseResouces](conn swConnectionStruct, method func(ctx context.Context) ([]T, error)) CommandExecutor[T] {
+func simpleExecutor[T splitwiseResouces](conn SwConnection, method func(ctx context.Context) ([]T, error)) CommandExecutor[T] {
 	ch := make(chan T)
 	ce := commandExecutorStruct[T]{}
 	ce.ch = ch
-	ce.swConnectionStruct = conn
+	ce.SwConnection = conn
 	ce.close = false
 
 	go func(ch chan<- T) {
 		defer ce.cleanCe()
 		defer recoverClosedChannel()
-		entities, err := method(ce.ctx)
+		entities, err := method(ce.getCtx())
 
 		if err != nil {
 			ce.getClient().Logger.Printf(err.Error())
@@ -149,7 +154,7 @@ func (conn swConnectionStruct) retriveCachedMainCategor() CommandExecutor[resour
 	ch := make(chan resources.MainCategory)
 	ce := commandExecutorStruct[resources.MainCategory]{}
 	ce.ch = ch
-	ce.swConnectionStruct = conn
+	ce.SwConnection = conn
 	ce.close = false
 
 	go func(ch chan<- resources.MainCategory) {
@@ -192,7 +197,7 @@ func (conn swConnectionStruct) retriveCachedCurrency() CommandExecutor[resources
 	ch := make(chan resources.Currency)
 	ce := commandExecutorStruct[resources.Currency]{}
 	ce.ch = ch
-	ce.swConnectionStruct = conn
+	ce.SwConnection = conn
 	ce.close = false
 
 	go func(ch chan<- resources.Currency) {
@@ -232,7 +237,7 @@ func (conn swConnectionStruct) GetNotifications(params splitwise.NotificationsPa
 	ch := make(chan resources.Notification)
 	ce := commandExecutorStruct[resources.Notification]{}
 	ce.ch = ch
-	ce.swConnectionStruct = conn
+	ce.SwConnection = conn
 	ce.close = false
 
 	go func(ch chan<- resources.Notification) {
@@ -240,9 +245,9 @@ func (conn swConnectionStruct) GetNotifications(params splitwise.NotificationsPa
 		defer recoverClosedChannel()
 		client := conn.getClient()
 
-		notifications, err := client.GetNotifications(ce.ctx, params)
+		notifications, err := client.GetNotifications(ce.getCtx(), params)
 		if err != nil {
-			ce.client.Logger.Printf(err.Error())
+			ce.getClient().Logger.Printf(err.Error())
 			return
 		}
 
@@ -269,7 +274,7 @@ func (conn swConnectionStruct) GetExpenses(params splitwise.ExpensesParams) Comm
 	ce := commandExecutorStruct[resources.Expense]{}
 
 	ce.ch = ch
-	ce.swConnectionStruct = conn
+	ce.SwConnection = conn
 	ce.close = false
 
 	go func(ch chan<- resources.Expense) {
@@ -281,9 +286,9 @@ func (conn swConnectionStruct) GetExpenses(params splitwise.ExpensesParams) Comm
 			cont int
 		)
 		for !ce.close {
-			expenses, err := client.GetExpenses(ce.ctx, params)
+			expenses, err := client.GetExpenses(ce.getCtx(), params)
 			if err != nil {
-				ce.client.Logger.Printf(err.Error())
+				ce.getClient().Logger.Printf(err.Error())
 				break
 			}
 
@@ -331,9 +336,17 @@ func (ce *commandExecutorStruct[T]) cleanCe() {
 
 func init() {
 	conn := Open("", context.Background(), log.New(os.Stdout, "Splitwise Init LOG: ", log.Lshortfile))
-	ceCurency := conn.GetCurecies()
-	for range ceCurency.GetChan() {
+	// ceCurency := conn.GetCurecies()
+
+	client := conn.getClient()
+
+	ce := simpleExecutor(conn, client.GetCurrencies)
+	for v := range ce.GetChan() {
+		curenciesCache[v.CurrencyCode] = v
 	}
+
+	// for range ceCurency.GetChan() {
+	// }
 	ceCategory := conn.GetMainCategories()
 	for range ceCategory.GetChan() {
 	}
