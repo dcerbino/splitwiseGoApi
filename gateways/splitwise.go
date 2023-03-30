@@ -297,7 +297,6 @@ func recoverClosedChannel() {
 func (ce *commandExecutorStruct[T]) cleanCe() {
 	ce.close = true
 	close(ce.ch)
-	fmt.Println("channel closed succesfuly")
 }
 
 func init() {
