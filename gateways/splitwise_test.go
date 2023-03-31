@@ -143,5 +143,4 @@ func TestGetCurrencyNotFund(t *testing.T) {
 	_, err := conn.GetCurency(currencyCode)
 
 	assert.EqualErrorf(err, (&ElementNotFound{}).Error(), "Error should be: %v, got: %v", (&ElementNotFound{}).Error(), err)
-
 }
