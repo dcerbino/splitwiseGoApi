@@ -1,14 +1,127 @@
 package gateways
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/aanzolaavila/splitwise.go/resources"
 	"github.com/stretchr/testify/assert"
 )
+
+const getFriends200Response = `
+{
+  "friends": [
+    {
+      "id": 15,
+      "first_name": "Ada",
+      "last_name": "Lovelace",
+      "email": "ada@example.com",
+      "registration_status": "confirmed",
+      "picture": {
+        "small": "string",
+        "medium": "string",
+        "large": "string"
+      },
+      "groups": [
+        {
+          "group_id": 571,
+          "balance": [
+            {
+              "currency_code": "USD",
+              "amount": "414.5"
+            }
+          ]
+        }
+      ],
+      "balance": [
+        {
+          "currency_code": "USD",
+          "amount": "414.5"
+        }
+      ],
+      "updated_at": "2019-08-24T14:15:22Z"
+    },
+	{
+		"id": 16,
+		"first_name": "Pepe",
+		"last_name": "ponce",
+		"email": "pepe@example.com",
+		"registration_status": "confirmed",
+		"picture": {
+		  "small": "string",
+		  "medium": "string",
+		  "large": "string"
+		},
+		"groups": [
+		  {
+			"group_id": 571,
+			"balance": [
+			  {
+				"currency_code": "USD",
+				"amount": "329.5"
+			  }
+			]
+		  }
+		],
+		"balance": [
+		  {
+			"currency_code": "USD",
+			"amount": "329.5"
+		  }
+		],
+		"updated_at": "2019-08-23T14:15:22Z"
+	  }
+  ]
+}
+`
+
+type httpClientStub struct {
+	DoFunc func(*http.Request) (*http.Response, error)
+}
+
+func (c httpClientStub) Do(r *http.Request) (*http.Response, error) {
+	if c.DoFunc == nil {
+		panic("mocked function is nil")
+	}
+
+	return c.DoFunc(r)
+}
+
+type logger interface {
+	Printf(string, ...interface{})
+}
+
+type testLogger struct {
+	buf    bytes.Buffer
+	logger logger
+	once   sync.Once
+	T      *testing.T
+}
+
+func (l testLogger) Printf(s string, args ...interface{}) {
+	l.once.Do(func() {
+		tname := l.T.Name()
+		prefix := fmt.Sprintf("%s:: ", tname)
+		l.logger = log.New(io.Writer(&l.buf), prefix, log.LstdFlags)
+
+		l.T.Cleanup(func() {
+			if l.T.Failed() {
+				fmt.Print(l.buf.String())
+			}
+		})
+	})
+
+	l.logger.Printf(s, args...)
+}
 
 func TestOpen(t *testing.T) {
 	assert := assert.New(t)
@@ -143,4 +256,60 @@ func TestGetCurrencyNotFund(t *testing.T) {
 	_, err := conn.GetCurency(currencyCode)
 
 	assert.EqualErrorf(err, (&ElementNotFound{}).Error(), "Error should be: %v, got: %v", (&ElementNotFound{}).Error(), err)
+}
+
+func TestGetFriends(t *testing.T) {
+	doFunc := func(r *http.Request) (*http.Response, error) {
+		resposne := http.Response{}
+		resposne.Body = io.NopCloser(strings.NewReader(getFriends200Response))
+		resposne.Header = make(map[string][]string)
+		resposne.Header["Content-Type"] = []string{"application/json", "charset=utf-8"}
+		resposne.Status = "200"
+		resposne.StatusCode = 200
+		return &resposne, nil
+	}
+
+	type responseStruct struct {
+		Friends []resources.Friend
+	}
+	wantedRespounce := responseStruct{}
+
+	err := json.Unmarshal([]byte(getFriends200Response), &wantedRespounce)
+
+	if err != nil {
+		panic(err)
+	}
+
+	conn := getTestConnection(t, doFunc)
+
+	executor := conn.GetFriends()
+
+	cont := 0
+
+	for range executor.GetChan() {
+		cont++
+	}
+
+	assert.Equal(t, len(wantedRespounce.Friends), cont)
+}
+
+func getTestConnection(t *testing.T, doFunc func(r *http.Request) (*http.Response, error)) SwConnection {
+	client := Open("testtoken", context.Background(), log.New(os.Stdout, "Test Splitwise LOG: ", log.Lshortfile))
+
+	bareclient, ok := client.(*swConnectionStruct)
+
+	if !ok {
+		panic("unable to convert interface to istance")
+	}
+
+	cliststub := httpClientStub{
+		DoFunc: doFunc,
+	}
+
+	bareclient.client.HttpClient = cliststub
+	bareclient.client.Logger = testLogger{
+		T: t,
+	}
+
+	return bareclient
 }
